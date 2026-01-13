@@ -26,7 +26,7 @@ const VideoDetail = () => {
 
   if (loadingDetail) return <Loader />;
   if (!videoDetail || !videoDetail?.snippet)
-    return <Typography color="red">Video not found!</Typography>;
+    return <Typography color="red">Video not found</Typography>;
 
   const {
     snippet: { title, channelId, channelTitle },
