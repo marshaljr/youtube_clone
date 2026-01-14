@@ -114,10 +114,10 @@ const Feed = ({ mainRef }) => {
           <Videos videos={allVideos} />
         ) : (
           <Typography color="gray" pl={2}>
-            No videos found
+            No videos found!
           </Typography>
         )}
-        <div ref={loadMoreRef} style={{ height: "1px" }}>
+        <div ref={loadMoreRef} style={{ height: "1.5px" }}>
           {isFetchingNextPage && <Loader />}
         </div>
       </Box>
