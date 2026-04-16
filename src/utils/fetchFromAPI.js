@@ -1,21 +1,58 @@
-const SERVER_URL =
-  import.meta.env.VITE_REACT_BACKEND_API_URL || "http://localhost:5000";
+const configuredServerUrl = import.meta.env.VITE_REACT_BACKEND_API_URL?.replace(
+  /\/$/,
+  "",
+);
+
+const localServerUrls = Array.from(
+  { length: 11 },
+  (_, index) => `http://localhost:${5000 + index}`,
+);
+
+const serverUrlCandidates = [configuredServerUrl, ...localServerUrls].filter(
+  (url, index, arr) => Boolean(url) && arr.indexOf(url) === index,
+);
+
+let activeServerUrl = configuredServerUrl || null;
+
+const fetchFromBackend = async (path) => {
+  const candidateUrls = activeServerUrl
+    ? [
+        activeServerUrl,
+        ...serverUrlCandidates.filter((url) => url !== activeServerUrl),
+      ]
+    : serverUrlCandidates;
+
+  let lastError = null;
+
+  for (const baseUrl of candidateUrls) {
+    try {
+      const response = await fetch(`${baseUrl}${path}`);
+
+      if (!response.ok) {
+        const errText = await response.text();
+        throw new Error(`Error ${response.status}: ${errText}`);
+      }
+
+      activeServerUrl = baseUrl;
+      return response;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+
+  throw new Error(
+    `Failed to fetch backend from: ${candidateUrls.join(", ")}. Last error: ${lastError?.message || "Unknown error"}`,
+  );
+};
 
 // Fetch list of videos
 export const fetchVideos = async ({ query = "New", pageToken = "" }) => {
   try {
-    if (!SERVER_URL) throw new Error("Backend URL is not in .env");
-
-    const url = `${SERVER_URL}/api/videos?q=${encodeURIComponent(
-      query || "New"
+    const path = `/api/videos?q=${encodeURIComponent(
+      query || "New",
     )}${pageToken ? `&pageToken=${pageToken}` : ""}`;
 
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Error ${response.status}: ${errText}`);
-    }
+    const response = await fetchFromBackend(path);
 
     const data = await response.json();
     return {
@@ -32,14 +69,7 @@ export const fetchVideos = async ({ query = "New", pageToken = "" }) => {
 export const fetchVideoDetail = async (videoId) => {
   if (!videoId) throw new Error("Missing video ID");
 
-  const url = `${SERVER_URL}/api/video/${videoId}`;
-
-  const response = await fetch(url);
-
-  if (!response.ok) {
-    const errText = await response.text();
-    throw new Error(`Error ${response.status}: ${errText}`);
-  }
+  const response = await fetchFromBackend(`/api/video/${videoId}`);
 
   const data = await response.json();
   return data;

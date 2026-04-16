@@ -2,11 +2,12 @@ import express from "express";
 import axios from "axios";
 import cors from "cors";
 import dotenv from "dotenv";
+import http from "node:http";
 
 dotenv.config();
 
 const app = express();
-const port = process.env.PORT || 5000;
+const requestedPort = Number(process.env.PORT) || 5000;
 const API_KEY = process.env.VITE_REACT_API_KEY;
 
 if (!API_KEY) {
@@ -21,17 +22,28 @@ const allowedOrigins = [
   "https://youtube-clone-git-main-marshal-rams-projects.vercel.app/",
   "https://youtube-clone-35jh2en1l-marshal-rams-projects.vercel.app/",
 ];
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+
+  if (allowedOrigins.includes(origin)) return true;
+
+  return (
+    /^http:\/\/localhost:\d+$/.test(origin) ||
+    /^http:\/\/127\.0\.0\.1:\d+$/.test(origin)
+  );
+};
 // app.use(cors);
 app.use(
   cors({
     origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
+      if (isAllowedOrigin(origin)) {
         callback(null, true);
       } else {
         callback(new Error("Not allowed by CORS"));
       }
     },
-  })
+  }),
 );
 
 const YOUTUBE_BASE_URL = "https://www.googleapis.com/youtube/v3";
@@ -89,11 +101,32 @@ app.get("/api/video/:id", async (req, res) => {
   }
 });
 
-app.listen(port, (err) => {
-  if (err) {
-    throw err;
-  }
-  console.log(`✅ Server running locally on http://localhost:${port}`);
-});
+const MAX_PORT_RETRIES = 10;
+
+const startServer = (port, retriesLeft = MAX_PORT_RETRIES) => {
+  const server = http.createServer(app);
+
+  server.once("listening", () => {
+    console.log(`✅ Server running locally on http://localhost:${port}`);
+  });
+
+  server.once("error", (err) => {
+    if (err.code === "EADDRINUSE" && retriesLeft > 0) {
+      const nextPort = port + 1;
+      console.warn(
+        `⚠️ Port ${port} is in use. Retrying on http://localhost:${nextPort}`,
+      );
+      startServer(nextPort, retriesLeft - 1);
+      return;
+    }
+
+    console.error("Failed to start server:", err);
+    process.exit(1);
+  });
+
+  server.listen(port);
+};
+
+startServer(requestedPort);
 
 export default app;
